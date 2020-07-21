@@ -125,12 +125,5 @@ int main(){
     double time = (double(t1_moore-t0)/CLOCKS_PER_SEC);
     cout << "Execution Time: " << time*1000 << endl;*/
 
-    //TABLE FILLING
-
-    /*t1_tf = clock();
-    minimizacion.print();*/
-    
-
-
     return 0;
 }
