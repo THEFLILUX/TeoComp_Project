@@ -1,146 +1,247 @@
-#include <bits/stdc++.h>
+#include <iostream>
+#include <vector>
+#include <string>
 using namespace std;
 
-const int N = 109;
+template<typename T>
+struct state{
+typedef state<T> states;
 
-int t[N][N]; // Tabla de transicion
-bool fs[N]; // Estados finales
-bool printed[N];
-vector<vector<int> > pi[2]; // Conjuntos de clases equivalentes
+char nombre;
+bool final = false;
+bool inicial = false;
+bool in_set = false;
+int set;
+vector<pair<T,states*>> transitions;
 
-// n es el numero de estados, m es el numero de simbolos, nfs es el numero de estados finales
-int n, m, nfs;
+    state(){}
+    
+    state(char nombre,bool acceptance, bool initiation): nombre(nombre),final(acceptance),inicial(initiation){}
+    
+    void set_t(T varchar, state<T>* estado){
+        pair<T,states*> temp = {varchar,estado};
+        this->transitions.push_back(temp);
+    }
 
-// Devuelve el indice de la clase equivalente que contiene a x en pi[0]
-int idx(int x) {
-    for(int i=0; i<pi[0].size(); i++) {
-        for(int j=0; j<pi[0][i].size(); j++) {
-            if(pi[0][i][j] == x) return i;
+    bool get_start(){
+        return inicial;
+    }
+    
+    bool get_final(){
+        return final;
+    }
+
+    state<T>* get_estado(T n){
+        for(auto i = 0 ; i < transitions.size() ; ++i){
+            if(transitions.at(i).first == n)
+                return transitions.at(i).second;
         }
     }
-}
 
-//Imprimo el AFD
-void print_min() {
-    cout << "\nAFD minimizado:\n";
-    cout << "---------------------\n";
-    cout << "Q\t";
-    for(int j=0; j<m; j++) cout << j << "\t"; cout << endl << endl;
-    for(int i=0; i<n; i++) {
-        if(printed[i] == 1) continue;
-        int ind = idx(i);
-        cout << "[";
-        for(int k=0; k<pi[0][ind].size(); k++) {
-            cout << pi[0][ind][k];
-            printed[k] = 1;
-        }
-        cout << "]\t";
-        for(int j=0; j<m; j++) {
-            ind = idx(t[i][j]);
-            cout << "[";
-            for(int k=0; k<pi[0][ind].size(); k++) {
-                cout << pi[0][ind][k];
+    bool operator==(states* estado){
+        return nombre == estado->nombre;
+    }
+
+    bool operator!=(states* estado){
+        return nombre != estado->nombre;
+    }
+
+};
+
+template<typename T>
+class DFA{
+    private:
+    typedef state<T> states;
+    vector<vector<states*>> sets;
+    vector<states*> aceptacion;
+    vector<states*> no_aceptacion;
+    states* inicial;
+    int numtrans = 0;
+    int numsets = 2;
+    vector<T> trans;
+
+    void Paso1(states* head){
+        
+        if(!head->in_set){    
+            if(head->final){
+                aceptacion.push_back(head);
+                head->set = 1;
+            }else{
+                no_aceptacion.push_back(head);
+                head->set = 0;
             }
-            cout << "]\t";
-        }
-        cout << endl;
-    }
-    cout << endl;
-}
 
-int main(){
+            head->in_set = true;
 
-    /*
-        Input:
-            1 2
-            1 3
-            1 2
-            1 4
-            1 2
-
-    */
-
-    n = 5, m = 2;
-    nfs = 1; // solo 1 estado final
-    // marco el estado final con TRUE
-    fs[4] = true;
-
-    // Ingreso la tabla de transicion
-    for(int i=0; i<n; i++) {
-        for(int j=0; j<m; j++) {
-            cin >> t[i][j];
+            if(!head->transitions.empty()){
+                for(auto i = 0 ; i < head->transitions.size() ; ++i){
+                    Paso1(head->transitions[i].second);
+                }
+            }
         }
     }
 
-    // Inicializo el conjunto de clases equivalentes
-    vector<int> v[2];
-    for(int i=0; i<n; i++) {
-        v[fs[i]].push_back(i);
-    }
-    pi[0].push_back(v[0]); pi[0].push_back(v[1]);
-    pi[1] = pi[0];
+    void Equivalencia(){
+        
+        bool bandera = false;
 
-    //  Maximas iteraciones
-    int iters = 100;
-
-    // Descompongo las clases equivalentes hasta que la antigua y la nueva pi no sean iguales
-    while(iters--) {
-        pi[0] = pi[1];
-
-        for(int i=0; i<pi[1].size(); i++) {
-            for(int j=1; j<pi[1][i].size(); j++) {
-                bool placed = 0;
-                for(int k=0; k<j; k++) {
-                    bool compat = 1;
-                    for(int l=0; l<m; l++) {
-                        if(idx(t[pi[1][i][j]][l]) != idx(t[pi[1][i][k]][l])) {
-                            compat = 0;
-                            break;
+        do{
+            bandera = false;
+            vector<states*> equivalence;
+            int original = sets.size();
+            for(int i = 0; i < original; i++){
+                if(sets[i].size() > 1){
+                    for(int j = 1; j < sets[i].size(); j++){
+                        if(sets[i][0]->get_estado(0)->set != sets[i][j]->get_estado(0)->set || sets[i][0]->get_estado(1)->set != sets[i][j]->get_estado(1)->set){
+                            equivalence.push_back(sets[i][j]);
+                            sets[i].erase(sets[i].begin()+j);
+                            j--;
                         }
                     }
-                    if(compat) {
-                        placed = 1;
+                    if(equivalence.size() > 0){
+                        sets.push_back(equivalence);
+                        for(auto z: sets[sets.size()-1])
+                            z->set = sets.size()-1;
+                        bandera = true;
+                    }
+                }
+            }
+        }while(bandera);
+    }
+            
+
+    public:
+
+    DFA():inicial(nullptr){}
+    
+    DFA(states* head):inicial(head){
+        numtrans = head->transitions.size();
+        for(auto i = 0 ; i < numtrans ; ++i){
+            trans.push_back(head->transitions.at(i).first);
+        }
+    }
+
+    void Paso1(){
+        Paso1(inicial);
+        sets.push_back(no_aceptacion);
+        sets.push_back(aceptacion);
+        
+    }
+
+    void Paso2(){
+        Equivalencia();
+    }
+
+    bool distinguibles(states* inic, vector<states*>& conjunto){
+
+            bool banderita = false;
+
+            vector<states*> diferentes;
+            for(auto i = 1 ; i < conjunto.size() ; ++i){
+                states* temp = conjunto.at(i);
+                for(auto j = 0 ; j < numtrans ; ++j){
+                    if(inic->get_estado(trans[j])->set != temp->get_estado(trans[j])->set){
+                        diferentes.push_back(temp);
+                        banderita = true;
                         break;
                     }
+                    else
+                        continue;
                 }
-                if(placed) continue;
-                for(int x = pi[0].size(); x<pi[1].size(); x++) {
-                    for(int k=0; k<pi[1][x].size(); k++) {
-                        bool compat = 1;
-                        for(int l=0; l<m; l++) {
-                            if(idx(t[pi[1][i][j]][l]) != idx(t[pi[1][x][k]][l])) {
-                                compat = 0;
-                                break;
-                            }
-                        }
-                        if(compat) {
-                            pi[1][x].push_back(pi[1][i][j]);
-                            pi[1][i].erase(pi[1][i].begin() + j);
-                            placed = 1;
+            }
+
+            if(banderita){
+
+                
+                
+                for(int i = 0 ; i < conjunto.size() ; ++i){
+                    for(auto j = 0 ; j < diferentes.size() ; ++j){
+                        diferentes.at(j)->set=numsets;
+                        if(conjunto[i] == diferentes[j]){
+                            conjunto.erase(conjunto.begin()+i);
+                            i--;
                             break;
                         }
+                        else 
+                            continue;
                     }
-                    if(placed) break;
                 }
-                if(placed) continue;
 
-                vector<int> vv; vv.push_back(pi[1][i][j]);
-                pi[1].push_back(vv); pi[1][i].erase(pi[1][i].begin() + j);
+                numsets++;
+
+                
+                if(diferentes.size() > 1){
+                    if(distinguibles(diferentes.at(0),diferentes))
+                        return true;                    
+                    else 
+                    {   
+                        sets.push_back(diferentes);
+                        return false;
+                    }
+                }else if(diferentes.size() == 1){
+                    
+                    sets.push_back(diferentes);
+                    return false;
+                }
             }
-        }
-
-        for(int i=0; i<pi[0].size(); i++) {
-            sort(pi[0][i].begin(), pi[0][i].end());
-        }
-        sort(pi[0].begin(), pi[0].end());
-        for(int i=0; i<pi[1].size(); i++) {
-            sort(pi[1][i].begin(), pi[1][i].end());
-        }
-        sort(pi[1].begin(), pi[1].end());
-        if(pi[0] == pi[1]) break;
+            else
+                return false;            
+    }
+    
+    void distinguibles(){
+        int h = 3;
+        do{
+            h--;
+            for(auto i = 0; i < sets.size() ; ++i)
+                distinguibles(sets[i][0],sets.at(i));
+        }while(h);
     }
 
-    print_min();
+    void Moore(){
+        distinguibles();
+    }
 
-    return 0;
-}
+    void print(){
+
+        for(auto i = 0 ; i < numtrans ; ++i){
+            if(i == 0)
+                cout<<"     | "<<(inicial->transitions).at(0).first;
+            else if(i == numtrans - 1){
+                cout<<"  | "<<(inicial->transitions).at(i).first<<endl;
+            }else{
+                cout<<" | "<<(inicial->transitions).at(i).first;
+            }
+            
+        }
+
+        for(auto i= 0 ; i < sets.size() ; ++i){
+            states* temp;
+            for(auto j = 0 ; j < sets[i].size() ; ++j){
+                temp = sets[i].at(j);
+                if(temp->inicial && temp->final){
+                    cout<<"->*q"<<i<<"| ";
+                    break;
+                }else if(temp->inicial){
+                    cout<<"->q"<<i<<" | ";
+                    break;
+                }else if(temp->final){
+                    cout<<"* q"<<i<<" | ";
+                    break;
+                }else{
+                    cout<<"  q"<<i<<" | ";
+                    break;
+                }
+
+            }
+
+
+            for(auto k = 0 ; k < numtrans ; ++k){
+                cout<<"q"<<temp->transitions.at(k).second->set;
+                if(k == numtrans-1) cout<<endl;
+                else cout<<" | ";
+            }
+            
+        }
+    }
+
+};
